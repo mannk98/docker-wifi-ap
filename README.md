@@ -14,11 +14,30 @@ A plug-and-play **Dockerized WiFi Access Point (`hostapd` + `dnsmasq` + `iptable
 
 ---
 
+## Supported Hardware (USB WiFi Dongles)
+
+The Docker container works with **any Linux `nl80211`-compatible WiFi adapter** that supports **AP (Master) mode** (`iw list | grep -A 10 "Supported interface modes"`).
+
+### Tested & Verified Dongles
+
+| Device Model | USB ID (`lsusb`) | Chipset | Linux Driver Module | Band Support |
+| :--- | :--- | :--- | :--- | :--- |
+| **TP-Link Archer T3U / T2U Series** *(Tested on `man-vm`)* | `2357:011f` | **Realtek RTL8821AU / RTL8811AU** | `8821au` (`rtl8821au` DKMS) | Dual-Band (2.4GHz & 5GHz 802.11ac) |
+| **TP-Link Archer T3U / T3U Plus / T3U Nano (AC1300)** | `2357:012d` / `2357:0138` | **Realtek RTL8812BU / RTL8822BU** | `rtw88_8822bu` (Kernel 6.2+) / `88x2bu` | Dual-Band (2.4GHz & 5GHz 802.11ac) |
+| **Other `nl80211` USB Adapters** | Various | MediaTek (`mt76x2u`, `mt7921u`), Ralink (`rt2800usb`), Atheros (`ath9k_htc`) | In-kernel Linux drivers | 2.4GHz / 5GHz |
+
+> **Note on `man-vm` Hardware Check:**
+> Output from `lsusb` and `dmesg` on `man-vm` identifies the connected dongle as:
+> - **USB ID:** `2357:011f` (`TP-Link 802.11ac WLAN Adapter`)
+> - **Chipset / Driver:** **Realtek RTL8821AU / RTL8811AU** (`rtl8821au` / `8821au` out-of-tree DKMS module `v5.12.5.2`)
+
+---
+
 ## Quick Start
 
 ### Step 1: Install the USB WiFi Driver on the Host (One-time setup)
 
-If you are using a **Realtek RTL8821AU / RTL8811AU** USB WiFi adapter (e.g., TP-Link Archer T2U Plus / Nano `2357:011f`), run the included helper script on your Linux host to install the DKMS driver and configure `NetworkManager` to ignore `wlx*` interfaces:
+If your Linux host does not automatically create a `wlx...` interface when plugging in the dongle (common with **Realtek RTL8821AU / RTL8811AU** `2357:011f`), run the included helper script on your host to install the DKMS driver (`morrownr/8821au-20210708`) and configure `NetworkManager` to ignore `wlx*` interfaces:
 
 ```bash
 chmod +x install-driver.sh
