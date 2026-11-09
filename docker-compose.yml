@@ -1,0 +1,28 @@
+services:
+  wifi-ap:
+    build: .
+    image: wifi-ap-container:latest
+    container_name: wifi-ap
+    network_mode: host
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_MODULE
+    restart: unless-stopped
+    environment:
+      - NON_INTERACTIVE=1
+      - WIFI_IFACE=${WIFI_IFACE:-auto}
+      - ETH_IFACE=${ETH_IFACE:-auto}
+      - WIFI_SSID=${WIFI_SSID:-matinhieu}
+      - WIFI_PASSWORD=${WIFI_PASSWORD:-88888888}
+      - WIFI_HIDDEN=${WIFI_HIDDEN:-0}
+      - WIFI_BAND=${WIFI_BAND:-auto}
+      - WIFI_CHANNEL=${WIFI_CHANNEL:-auto}
+      - COUNTRY_CODE=${COUNTRY_CODE:-US}
+      - AP_IP=${AP_IP:-192.168.50.1}
+      - AP_SUBNET=${AP_SUBNET:-192.168.50.0/24}
+      - DHCP_START=${DHCP_START:-192.168.50.10}
+      - DHCP_END=${DHCP_END:-192.168.50.100}
+      - DHCP_LEASE=${DHCP_LEASE:-12h}
+

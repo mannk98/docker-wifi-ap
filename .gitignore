@@ -1,0 +1,11 @@
+# Environment variables (contains real WiFi SSID & password)
+.env
+.env.*
+!.env.example
+
+# Runtime & OS files
+*.pid
+*.log
+*.leases
+.DS_Store
+
