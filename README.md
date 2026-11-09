@@ -1,48 +1,48 @@
-# Docker WiFi Access Point (`wifi-ap`)
+# Docker WiFi Access Point (`docker-wifi-ap`)
 
-Giải pháp đóng gói **WiFi Access Point (`hostapd` + `dnsmasq` + `iptables` NAT)** trong Docker container trên Linux, hỗ trợ tự động nhận diện USB WiFi Dongle, tự động chọn băng tần/kênh tối ưu (5GHz / 2.4GHz) và không làm ảnh hưởng đến chuỗi mạng `iptables` của Docker trên máy Host.
-
----
-
-## Tính năng nổi bật
-
-- **Auto-detect Interfaces:** Tự động phát hiện USB WiFi interface (`wlx*` / `wlan*`) và cổng mạng Internet đầu ra (`ETH_IFACE`) khi để `auto`.
-- **Auto-detect Band & Channel:** Tự động quét phần cứng (`iw phy`) để ưu tiên phát sóng **5GHz (802.11ac/n)** nếu card hỗ trợ, hoặc fallback về **2.4GHz (802.11n/g)** ở các kênh ít nhiễu (1, 6, 11).
-- **Docker-safe `iptables`:** Chỉ thêm các rule NAT/FORWARD riêng của AP và tự động gỡ sạch khi `docker stop`, không dùng `iptables -F` gây mất mạng các container khác.
-- **Không xung đột DNS Host:** Cấu hình `dnsmasq` chỉ lắng nghe trên IP của Access Point, không đụng cổng `53` với `systemd-resolved` trên Ubuntu/Debian.
-- **Tự động khởi động lại:** Hỗ trợ `restart: unless-stopped` và health-check vòng lặp tự hồi phục khi rút/cắm lại USB WiFi hoặc khởi động lại máy.
+A plug-and-play **Dockerized WiFi Access Point (`hostapd` + `dnsmasq` + `iptables` NAT)** for Linux. It automatically detects USB WiFi dongles, selects optimal 5GHz/2.4GHz bands and channels, and manages NAT/routing rules without disrupting existing Docker `iptables` chains on the host.
 
 ---
 
-## Bắt đầu nhanh (Quick Start)
+## Key Features
 
-### Bước 1: Cài đặt Driver USB WiFi trên máy Host (Chạy 1 lần cho máy mới)
+- **Auto-detect Interfaces:** Automatically identifies your USB WiFi interface (`wlx*` / `wlan*`) and the outbound internet interface (`ETH_IFACE`) when set to `auto`.
+- **Auto-detect Band & Channel:** Queries hardware capabilities (`iw phy`) to prioritize **5GHz (802.11ac/n)** when supported, or falls back to **2.4GHz (802.11n/g)** on non-overlapping channels (`1`, `6`, `11`).
+- **Docker-safe `iptables`:** Inserts only AP-specific NAT/FORWARD rules and cleanly removes them on `docker stop`, avoiding `iptables -F` which would break other Docker containers.
+- **No Host DNS Conflicts:** Configures `dnsmasq` to bind strictly to the AP gateway IP, avoiding port `53` conflicts with `systemd-resolved` on Ubuntu/Debian hosts.
+- **Self-healing & Auto-restart:** Configured with `restart: unless-stopped` and a built-in process monitor to recover automatically across host reboots or USB dongle reconnects.
 
-Nếu bạn dùng USB WiFi chipset **Realtek RTL8821AU / RTL8811AU** (ví dụ: TP-Link Archer T2U Plus / Nano `2357:011f`), chạy script sau trên máy Host để tự động cài driver DKMS và cấu hình `NetworkManager` không tranh quyền của Docker:
+---
+
+## Quick Start
+
+### Step 1: Install the USB WiFi Driver on the Host (One-time setup)
+
+If you are using a **Realtek RTL8821AU / RTL8811AU** USB WiFi adapter (e.g., TP-Link Archer T2U Plus / Nano `2357:011f`), run the included helper script on your Linux host to install the DKMS driver and configure `NetworkManager` to ignore `wlx*` interfaces:
 
 ```bash
 chmod +x install-driver.sh
 sudo ./install-driver.sh
 ```
 
-*(Nếu `ip link` trên máy Host đã hiện sẵn interface `wlx...` hoặc `wlan...`, bạn có thể bỏ qua bước này).*
+*(If `ip link` on your host already shows your `wlx...` or `wlan...` interface, you can skip this step).*
 
-### Bước 2: Cấu hình thông tin WiFi (Tùy chọn)
+### Step 2: Configure WiFi Credentials (Optional)
 
-Tạo file `.env` từ file mẫu `.env.example` để đặt tên WiFi (`WIFI_SSID`) và mật khẩu (`WIFI_PASSWORD`) riêng của bạn:
+Create a `.env` file from `.env.example` to customize your `WIFI_SSID` and `WIFI_PASSWORD`:
 
 ```bash
 cp .env.example .env
 nano .env
 ```
 
-### Bước 3: Khởi chạy Access Point bằng Docker Compose
+### Step 3: Start the Access Point
 
 ```bash
 docker compose up -d --build
 ```
 
-> **Lưu ý:** Nếu máy Host trước đó từng bị xóa chain NAT của bridge `docker0` khiến lúc `docker build` không phân giải được DNS, hãy build với `--network=host`:
+> **Note:** If `docker build` fails to resolve DNS due to broken bridge NAT on the host, build the image using host networking first:
 > ```bash
 > docker build --network=host -t wifi-ap-container:latest .
 > docker compose up -d
@@ -50,46 +50,51 @@ docker compose up -d --build
 
 ---
 
-## Các biến môi trường cấu hình (`.env`)
+## Configuration (`.env`)
 
-| Biến | Mặc định | Mô tả |
+| Variable | Default | Description |
 | :--- | :--- | :--- |
-| `WIFI_IFACE` | `auto` | Tên card WiFi phát AP (`auto` sẽ tự động ưu tiên tìm USB WiFi `wlx*`) |
-| `ETH_IFACE` | `auto` | Cổng mạng có Internet để NAT (`auto` tự tìm qua `default route`) |
-| `WIFI_SSID` | `matinhieu` | Tên mạng WiFi phát ra |
-| `WIFI_PASSWORD` | `88888888` | Mật khẩu WiFi (WPA2-PSK, tối thiểu 8 ký tự) |
-| `WIFI_HIDDEN` | `0` | `0`: Hiện SSID, `1`: Ẩn SSID |
-| `WIFI_BAND` | `auto` | `auto` (ưu tiên 5GHz), `5ghz`, hoặc `2.4ghz` |
-| `WIFI_CHANNEL` | `auto` | `auto` hoặc chỉ định kênh cố định (VD: `6` cho 2.4GHz, `36`/`149` cho 5GHz) |
-| `COUNTRY_CODE` | `US` | Mã quốc gia quy định tần số phát sóng (`US`, `VN`, `TW`, `JP`...) |
-| `AP_IP` | `192.168.50.1` | Địa chỉ IP Gateway của Access Point |
-| `AP_SUBNET` | `192.168.50.0/24` | Dải mạng con của Access Point |
-| `DHCP_START` | `192.168.50.10` | IP bắt đầu cấp DHCP |
-| `DHCP_END` | `192.168.50.100` | IP kết thúc cấp DHCP |
-| `DHCP_LEASE` | `12h` | Thời gian thuê IP DHCP |
+| `WIFI_IFACE` | `auto` | Wireless interface for the AP (`auto` prioritizes USB WiFi `wlx*` interfaces) |
+| `ETH_IFACE` | `auto` | Outbound internet interface for NAT (`auto` detects via `default route`) |
+| `WIFI_SSID` | `matinhieu` | WiFi network name (SSID) |
+| `WIFI_PASSWORD` | `88888888` | WiFi WPA2-PSK passphrase (minimum 8 characters) |
+| `WIFI_HIDDEN` | `0` | `0`: Broadcast SSID, `1`: Hide SSID |
+| `WIFI_BAND` | `auto` | `auto` (prefers 5GHz), `5ghz`, or `2.4ghz` |
+| `WIFI_CHANNEL` | `auto` | `auto` or a specific channel number (e.g., `6` for 2.4GHz, `36`/`149` for 5GHz) |
+| `COUNTRY_CODE` | `US` | Regulatory domain country code (`US`, `VN`, `TW`, `JP`, etc.) |
+| `AP_IP` | `192.168.50.1` | Access Point gateway IP address |
+| `AP_SUBNET` | `192.168.50.0/24` | Access Point subnet CIDR |
+| `DHCP_START` | `192.168.50.10` | DHCP pool start address |
+| `DHCP_END` | `192.168.50.100` | DHCP pool end address |
+| `DHCP_LEASE` | `12h` | DHCP lease duration |
 
 ---
 
-## Các lệnh kiểm tra & vận hành hữu ích
+## Useful Commands
 
-- **Xem log hoạt động của Access Point:**
+- **View Access Point logs:**
   ```bash
   docker compose logs -f
   ```
-- **Kiểm tra trạng thái phát sóng, kênh và công suất phát (`txpower`):**
+- **Check wireless interface status, channel, and `txpower`:**
   ```bash
   docker exec wifi-ap iw dev
   ```
-- **Xem danh sách các thiết bị đang kết nối (IP, MAC, Hostname):**
+- **List connected DHCP clients (IP, MAC, Hostname):**
   ```bash
   docker exec wifi-ap cat /var/lib/misc/dnsmasq.leases
   ```
-- **Xem chi tiết cường độ tín hiệu (RSSI, tốc độ TX/RX) của từng thiết bị:**
+- **Inspect connected station signal strength (RSSI, TX/RX bitrates):**
   ```bash
   docker exec wifi-ap sh -c 'iw dev $(iw dev | awk "\$1==\"Interface\"{print \$2; exit}") station dump'
   ```
-- **Dừng Access Point (tự động hạ card WiFi và gỡ rule `iptables`):**
+- **Stop the Access Point (automatically brings down the interface and cleans up `iptables` rules):**
   ```bash
   docker compose down
   ```
 
+---
+
+## License
+
+This project is licensed under the [Apache License 2.0](LICENSE).
